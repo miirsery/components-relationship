@@ -1,0 +1,33 @@
+{
+  "name": "app",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "dependencies": {
+    "typed-icon-template": "^0.0.6",
+    "vue": "^3.4.37"
+  },
+  "devDependencies": {
+    "@chromatic-com/storybook": "1.9.0",
+    "@storybook/addon-essentials": "8.3.2",
+    "@storybook/addon-interactions": "8.3.2",
+    "@storybook/addon-links": "8.3.2",
+    "@storybook/addon-onboarding": "8.3.2",
+    "@storybook/blocks": "8.3.2",
+    "@storybook/test": "8.3.2",
+    "@storybook/vue3": "8.3.2",
+    "@storybook/vue3-vite": "8.3.2",
+    "@vitejs/plugin-vue": "^5.1.2",
+    "storybook": "8.3.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1",
+    "vue-tsc": "^2.0.29"
+  },
+  "packageManager": "pnpm@9.9.0+sha512.60c18acd138bff695d339be6ad13f7e936eea6745660d4cc4a776d5247c540d0edee1a563695c183a66eb917ef88f2b4feb1fc25f32a7adcadc7aaf3438e99c1"
+}
