@@ -1,13 +1,13 @@
 {
+  "UiButton": [
+    "./src/App.vue",
+    "./src/components/HelloWorld.vue"
+  ],
   "HelloWorld": [
     "./src/App.vue",
     "./src/components/HelloWrapper.vue"
   ],
   "HelloWrapper": [
     "./src/App.vue"
-  ],
-  "Button": [
-    "./src/components/Button/Button.vue",
-    "./src/components/HelloWorld.vue"
   ]
 }

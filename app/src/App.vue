@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import UiButton from './components/Button/UiButton.vue';
+import UiButton from './components/UiButton/UiButton.vue';
 import HelloWorld from './components/HelloWorld.vue'
 import HelloWrapper from './components/HelloWrapper.vue'
 </script>

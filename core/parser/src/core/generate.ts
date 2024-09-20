@@ -2,35 +2,69 @@ import { Plugin } from 'vite'
 const fs = require('fs')
 const path = require('path')
 
+// FIXME: Добавить опцию hideUnused
+
 // Опции по умолчанию
 const defaultOptions = {
-  componentsPath: 'src/components', // Путь к папке компонентов
-  searchPath: 'src', // Путь к папке, где необходимо искать использования компонентов
-  baseDir: 'app' // Папка, относительно которой нужно строить путь
+  componentsPath: 'src/components',
+  searchPath: 'src',
+  baseDir: 'app',
+  storyFilesPattern: '\\.stories\\.ts$',
 }
 
+// Плагин для обработки компонентных связей и обновления файлов Storybook
 export const componentRelationshipsPlugin = (userOptions = {}): Plugin => {
-  const options = { ...defaultOptions, ...userOptions } // Объединение дефолтных и пользовательских опций
+  const options = { ...defaultOptions, ...userOptions }
 
   return {
     name: 'vite:component-relationships',
 
     async buildStart() {
-      // Найти все компоненты
       const componentFiles = await getFiles(options.componentsPath, /\.vue$/)
       const components = componentFiles.map((file) => path.basename(file, path.extname(file)))
-
-      // Найти использования компонентов
       const componentUsages = await findComponentUsages(components, options)
-
-      // Преобразовать в строку JSON
-      const jsonString = JSON.stringify(componentUsages, null, 2)
-
-      // Сохранить результат в файл
-      await fs.promises.writeFile('component-usage.json', jsonString)
-
-      console.log('Компонентные связи сохранены в component-usage.json')
+      await updateStorybookFiles(componentUsages, options)
+      console.log('Компонентные связи обновлены в Storybook файлах.')
     },
+  }
+}
+
+// Функция для обновления файлов Storybook
+async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: any) {
+  for (const component in componentUsages) {
+    const usage = componentUsages[component]
+    const storyFilePath = path.resolve(options.componentsPath, component, `${component}.stories.ts`)
+
+    console.log('Проверка пути к файлу:', storyFilePath)
+    console.log('fs.existsSync(storyFilePath)', fs.existsSync(storyFilePath))
+
+    if (fs.existsSync(storyFilePath)) {
+      let content = await fs.promises.readFile(storyFilePath, 'utf-8')
+
+      // Создаем строку использования компонента
+      const usageString = `Использования компонента ${component}:\n- ${usage.join('\n- ')}`
+
+      /// Заменяем существующий блок meta.parameters на новый
+      content = content.replace(/meta\.parameters\s*=\s*{[\s\S]*?};\s*/, '') // Удаляем старый блок
+
+      // Формируем новые параметры
+      const newParameters = `
+      meta.parameters = {
+        docs: {
+          description: {
+            component: \`${usageString}\`
+          }
+        }
+      };`
+
+// Добавляем новые параметры в файл
+content += newParameters.trim() + '\n' // Добавляем новые параметры
+
+      await fs.promises.writeFile(storyFilePath, content)
+      console.log(`Обновлен Storybook файл: ${storyFilePath}`)
+    } else {
+      console.warn(`Файл не найден: ${storyFilePath}`)
+    }
   }
 }
 
@@ -39,15 +73,12 @@ async function findComponentUsages(components: string[], options: any) {
   const { baseDir, searchPath } = options
   const componentUsages: Record<string, string[]> = {}
 
-  // Получить все файлы для сканирования
   const paths = await getFiles(searchPath, /\.(vue)$/)
 
   for (const filePath of paths) {
     const content = await fs.promises.readFile(filePath, 'utf-8')
 
-    // Проверка использования каждого компонента
     for (const component of components) {
-      // Создать регулярные выражения для поиска в CamelCase и kebab-case
       const camelCaseRegex = new RegExp(`<${component}[^>]*>`, 'g')
       const kebabCaseRegex = new RegExp(`<${toKebabCase(component)}[^>]*>`, 'g')
 
@@ -56,17 +87,12 @@ async function findComponentUsages(components: string[], options: any) {
           componentUsages[component] = []
         }
 
-        // Генерация относительного пути с корректной заменой слэшей и убиранием лишних ../
         let relativePath = path.relative(baseDir, filePath).replace(/\\/g, '/')
-
-        // Убедиться, что путь начинается с './'
         if (!relativePath.startsWith('.')) {
           relativePath = './' + relativePath
         }
 
-        // Убираем лишние '../' из пути
         relativePath = relativePath.replace(/^\.\.\//g, './')
-
         componentUsages[component].push(relativePath)
       }
     }
@@ -77,9 +103,7 @@ async function findComponentUsages(components: string[], options: any) {
 
 // Функция для преобразования имени компонента в kebab-case
 function toKebabCase(str: string) {
-  return str
-    .replace(/([a-z])([A-Z])/g, '$1-$2')
-    .toLowerCase()
+  return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
 // Функция для получения файлов из директории (рекурсивно)

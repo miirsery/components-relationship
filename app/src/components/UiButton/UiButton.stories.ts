@@ -15,6 +15,7 @@ const meta = {
     primary: false,
     onClick: fn(),
   },
+  parameters: {},
 } satisfies Meta<typeof Button>;
 
 export default meta;
@@ -46,4 +47,14 @@ export const Small: Story = {
     label: 'Button',
     size: 'small',
   },
+};
+
+meta.parameters = {
+  docs: {
+    description: {
+      component: `Использования компонента UiButton:
+- ./src/App.vue
+- ./src/components/HelloWorld.vue`
+    }
+  }
 };
