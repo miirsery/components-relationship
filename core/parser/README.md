@@ -6,13 +6,13 @@
 
 ```bash
 # NPM
-npm i typed-icon-template -D
+npm i component-relationships -D
 
 # YARN
-yarn add typed-icon-template -D
+yarn add component-relationships -D
 
 # PNPM
-pnpm add typed-icon-template -D
+pnpm add component-relationships -D
 ```
 
 ## Использование
@@ -20,7 +20,7 @@ pnpm add typed-icon-template -D
 - Конфигурация в файле **vite.config.ts**
 
 ```ts
-import { typedIconPlugin } from 'typed-icon-template'
+import { typedIconPlugin } from 'component-relationships'
 import path from 'path'
 
 export default defineConfig({

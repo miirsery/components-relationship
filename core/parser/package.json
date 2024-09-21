@@ -1,5 +1,5 @@
 {
-  "name": "typed-icon-template",
+  "name": "component-relationships",
   "description": "Vite Plugin for generate types by *.svg sprites",
   "author": "miirsery",
   "private": false,
@@ -8,25 +8,25 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/typed-icon-template.umd.cjs",
-  "module": "./dist/typed-icon-template.js",
+  "main": "./dist/component-relationships.umd.cjs",
+  "module": "./dist/component-relationships.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/typed-icon-template.js",
-      "require": "./dist/typed-icon-template.umd.cjs"
+      "import": "./dist/component-relationships.js",
+      "require": "./dist/component-relationships.umd.cjs"
     }
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/miirsery/typed-icon-component.git",
+    "url": "https://github.com/miirsery/components-relationship",
     "directory": "src/core"
   },
   "bugs": {
-    "url": "https://github.com/miirsery/typed-icon-component.git/issues"
+    "url": "https://github.com/miirsery/components-relationship/issues"
   },
-  "homepage": "https://github.com/miirsery/typed-icon-component.git/tree/master/#readme",
+  "homepage": "https://github.com/miirsery/components-relationship/tree/master/#readme",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

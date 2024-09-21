@@ -1,34 +1,65 @@
-import { Plugin } from 'vite'
+import { PluginOption } from 'vite'
+import { ComponentRelationsType } from './types'
 const fs = require('fs')
 const path = require('path')
 
 // Опции по умолчанию
-const defaultOptions = {
+const defaultOptions: ComponentRelationsType = {
   componentsPath: 'src/components',
   searchPath: 'src',
   baseDir: 'app',
   storyFilesPattern: '\\.stories\\.ts$',
+  output: {
+    path: './',
+    fileName: 'component-usage.json',
+  }
 }
 
 // Плагин для обработки компонентных связей и обновления файлов Storybook
-export const componentRelationshipsPlugin = (userOptions = {}): Plugin => {
-  const options = { ...defaultOptions, ...userOptions }
+export const componentRelationshipsPlugin = (relationOptions?: ComponentRelationsType): PluginOption => {
+  const options = { ...defaultOptions, ...relationOptions }
 
   return {
     name: 'vite:component-relationships',
 
     async buildStart() {
-      const componentFiles = await getFiles(options.componentsPath, /\.vue$/)
+      const componentFiles = await getFiles(options.componentsPath as string, /\.vue$/)
       const components = componentFiles.map((file) => path.basename(file, path.extname(file)))
       const componentUsages = await findComponentUsages(components, options)
+
       await updateStorybookFiles(componentUsages, options)
+
       console.log('[✅] Компонентные связи успешно обновлены в Storybook файлах.')
+
+      if (options?.output && typeof options.output === 'object') {
+        await writeRelationsInFile(componentUsages, options.output)
+      }
+      
     },
   }
 }
 
+export async function writeRelationsInFile(
+  componentUsages: Record<string, string[]>,
+  outputOptions: { path: string, fileName: string }
+) {
+  // Преобразовать в строку JSON
+  const jsonString = JSON.stringify(componentUsages, null, 2)
+
+  // Построить полный путь к файлу
+  const outputPath = path.resolve(outputOptions.path, outputOptions.fileName)
+
+  // Убедиться, что директория существует, если нет — создать
+  await fs.promises.mkdir(outputOptions.path, { recursive: true })
+
+  // Сохранить результат в файл
+  await fs.promises.writeFile(outputPath, jsonString)
+
+  console.log(`[✅] Компонентные связи сохранены в ${outputPath}`)
+}
+
 // Функция для обновления файлов Storybook
-export async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: any) {
+export async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: ComponentRelationsType) {
   for (const component in componentUsages) {
     const usage = componentUsages[component]
     const storyFilePath = path.resolve(options.componentsPath, component, `${component}.stories.ts`)
@@ -66,11 +97,11 @@ meta.parameters = {
 }
 
 // Функция для поиска использования компонентов
-export async function findComponentUsages(components: string[], options: any) {
+export async function findComponentUsages(components: string[], options: ComponentRelationsType) {
   const { baseDir, searchPath } = options
   const componentUsages: Record<string, string[]> = {}
 
-  const paths = await getFiles(searchPath, /\.(vue)$/)
+  const paths = await getFiles(searchPath as string, /\.(vue)$/)
 
   for (const filePath of paths) {
     const content = await fs.promises.readFile(filePath, 'utf-8')

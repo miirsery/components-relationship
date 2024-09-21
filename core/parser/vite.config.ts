@@ -19,7 +19,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'TypedIconTemplate',
-      fileName: 'typed-icon-template',
+      fileName: 'component-relationships',
       formats: ['es', 'cjs', 'umd', 'iife'],
     },
   },

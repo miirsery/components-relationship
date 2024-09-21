@@ -10,7 +10,7 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "typed-icon-template": "^0.0.6",
+    "component-relationships": "^0.0.6",
     "vue": "^3.4.37"
   },
   "devDependencies": {
