@@ -1,7 +1,0 @@
-.gitignore
-
-node_modules/
-public/
-.md
-build/
-dist/

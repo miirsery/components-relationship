@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { build } = require('vite')
-const { componentRelationshipsPlugin } = require('../src/component-relationships-plugin')
+const { componentRelationshipsPlugin } = require('../core/generate')
 
 // Функция для запуска компонента
 ;(async () => {
