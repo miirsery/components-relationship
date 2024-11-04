@@ -9,7 +9,7 @@
     "dist"
   ],
   "bin": {
-    "components": "./bin/index.cjs"
+    "components": "./bin/index.js"
   },
   "main": "./dist/component-relationships.umd.cjs",
   "module": "./dist/component-relationships.js",
