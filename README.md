@@ -1,18 +1,18 @@
-# Typed Icon Component
+# Components Relationship
 
-Генерирует типы для компонента иконки. Создает файл типов в указанном месте.
+Отображает связи компонентов
 
 ## Установка
 
 ```bash
 # NPM
-npm i component-relationships -D
+npm i component-relationships
 
 # YARN
-yarn add component-relationships -D
+yarn add component-relationships
 
 # PNPM
-pnpm add component-relationships -D
+pnpm add component-relationships
 ```
 
 ## Использование
@@ -20,31 +20,16 @@ pnpm add component-relationships -D
 - Конфигурация в файле **vite.config.ts**
 
 ```ts
-import { typedIconPlugin } from 'component-relationships'
+import { componentRelationshipsPlugin } from 'component-relationships'
+
 import path from 'path'
 
 export default defineConfig({
   plugins: [
-    typedIconPlugin({
+    componentRelationshipsPlugin({
       iconsPath: path.join(process.cwd(), 'src', 'icons'),
       iconComponentPath: path.resolve(process.cwd(), 'src', 'IconTemplate'),
     }),
   ],
 })
 ```
-
-## API
-
-| Метод           | Параметры                                            | Описание                                   |
-| --------------- | ---------------------------------------------------- | ------------------------------------------ |
-| typedIconPlugin | options                                              | Плагин для создания типизированных иконок. |
-|                 | - iconsPath: string                                  | Путь до svg спрайтов.                      |
-|                 | - iconComponentPath: string                          | Путь до компонента.                        |
-|                 | - fileName?: string (default: `icon-names.types.ts`) | Имя файла.                                 |
-
-## TODO:
-
-- [x] Описать документацию функций
-- [x] Добавить возможность прокидывать папку, например, `types` и если её нет, то создавать её
-- [ ] Добавить тесты
-- [ ] Добавить CI/CD

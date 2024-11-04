@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { build } from 'vite'
-import { componentRelationshipsPlugin } from '../core/generate'
+import { componentRelationshipsPlugin } from '../dist/component-relationships.js'
 
 // Функция для запуска компонента
 ;(async () => {
