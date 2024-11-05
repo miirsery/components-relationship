@@ -1,6 +1,6 @@
 {
   "name": "component-relationships",
-  "description": "Vite Plugin for generate types by *.svg sprites",
+  "description": "Vite Plugin for generate components relations",
   "author": "miirsery",
   "private": false,
   "version": "0.0.4",
@@ -23,8 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/miirsery/components-relationship",
-    "directory": "core"
+    "url": "https://github.com/miirsery/components-relationship"
   },
   "bugs": {
     "url": "https://github.com/miirsery/components-relationship/issues"

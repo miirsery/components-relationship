@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 
-// import { build } from 'vite'
-// import { componentRelationshipsPlugin } from '../dist/component-relationships.js'
-
 const { build } = require('vite')
 const { componentRelationshipsPlugin } = require('../dist/component-relationships.cjs')
 

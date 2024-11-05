@@ -4,7 +4,7 @@ export type ComponentsRelationsOutputType = {
 }
 
 export type ComponentRelationsType = {
-  componentsPath?: string
+  componentsPath?: string[]
   searchPath?: string
   baseDir?: string
   storyFilesPattern?: string

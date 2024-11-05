@@ -5,7 +5,7 @@ const path = require('path')
 
 // Опции по умолчанию
 const defaultOptions: ComponentRelationsType = {
-  componentsPath: 'src/components',
+  componentsPath: ['src/components'],
   searchPath: 'src',
   baseDir: 'app',
   storyFilesPattern: '\\.stories\\.ts$',
@@ -23,8 +23,11 @@ export const componentRelationshipsPlugin = (relationOptions?: ComponentRelation
     name: 'vite:component-relationships',
 
     async buildStart() {
-      const componentFiles = await getFiles(options.componentsPath as string, /\.vue$/)
-      const components = componentFiles.map((file) => path.basename(file, path.extname(file)))
+      const componentFiles = await Promise.all(options.componentsPath!.map(async (componentPath) => {
+        return getFiles(componentPath as string, /\.vue$/)
+      }))
+      const flatComponentFiles = componentFiles.flat()
+      const components = flatComponentFiles.map((file) => path.basename(file, path.extname(file)))
       const componentUsages = await findComponentUsages(components, options)
 
       await updateStorybookFiles(componentUsages, options)
@@ -34,7 +37,6 @@ export const componentRelationshipsPlugin = (relationOptions?: ComponentRelation
       if (options?.output && typeof options.output === 'object') {
         await writeRelationsInFile(componentUsages, options.output)
       }
-
     },
   }
 }
@@ -43,49 +45,43 @@ export async function writeRelationsInFile(
   componentUsages: Record<string, string[]>,
   outputOptions: { path: string, fileName: string }
 ) {
-  // Преобразовать в строку JSON
   const jsonString = JSON.stringify(componentUsages, null, 2)
 
-  // Построить полный путь к файлу
   const outputPath = path.resolve(outputOptions.path, outputOptions.fileName)
 
-  // Убедиться, что директория существует, если нет — создать
   await fs.promises.mkdir(outputOptions.path, { recursive: true })
 
-  // Сохранить результат в файл
-  await fs.promises.writeFile(outputPath, jsonString)
-
-  console.log(`[✅] Компонентные связи сохранены в ${outputPath}`)
+  try {
+    await fs.promises.writeFile(outputPath, jsonString)
+    console.log(`[✅] Компонентные связи сохранены в ${outputPath}`)
+  } catch (err: any) {
+    console.error(`[❌] Ошибка записи в файл: ${err.message}`)
+  }
 }
 
 // Функция для обновления файлов Storybook
 export async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: ComponentRelationsType) {
   for (const component in componentUsages) {
     const usage = componentUsages[component]
-    const storyFilePath = path.resolve(options.componentsPath, component, `${component}.stories.ts`)
+    const storyFilePath = path.resolve(options.componentsPath![0], component, `${component}.stories.ts`)
 
     console.log(`[🔍] Проверка пути к файлу: ${storyFilePath}`)
 
     if (fs.existsSync(storyFilePath)) {
       let content = await fs.promises.readFile(storyFilePath, 'utf-8')
 
-      // Создаем строку использования компонента
       const usageString = `Использования компонента ${component}:\n- ${usage.join('\n- ')}`
 
-      // Заменяем существующий блок meta.parameters на новый
-      content = content.replace(/meta\.parameters\s*=\s*{[\s\S]*?};\s*/, '') // Удаляем старый блок
+      content = content.replace(/meta\.parameters\s*=\s*{[\s\S]*?}\s*/, '')
 
-      // Формируем новые параметры
-      const newParameters = `
-meta.parameters = {
+      const newParameters = `\nmeta.parameters = {
   docs: {
     description: {
       component: \`${usageString}\`
     }
   }
-};`
+}`
 
-      // Добавляем новые параметры в файл
       content += newParameters.trim() + '\n'
 
       await fs.promises.writeFile(storyFilePath, content)
@@ -99,10 +95,12 @@ meta.parameters = {
 // Функция для поиска использования компонентов
 export async function findComponentUsages(components: string[], options: ComponentRelationsType) {
   const { baseDir, searchPath } = options
+
   const componentUsages: Record<string, string[]> = {}
 
   const paths = await getFiles(searchPath as string, /\.(vue)$/)
 
+  // Ищем использования для каждого компонента
   for (const filePath of paths) {
     const content = await fs.promises.readFile(filePath, 'utf-8')
 
@@ -110,18 +108,25 @@ export async function findComponentUsages(components: string[], options: Compone
       const camelCaseRegex = new RegExp(`<${component}[^>]*>`, 'g')
       const kebabCaseRegex = new RegExp(`<${toKebabCase(component)}[^>]*>`, 'g')
 
+      // Проверяем, встречается ли компонент в файле
       if (camelCaseRegex.test(content) || kebabCaseRegex.test(content)) {
+        // Если не существует записи для данного компонента, создаем ее
         if (!componentUsages[component]) {
           componentUsages[component] = []
         }
 
-        let relativePath = path.relative(baseDir, filePath).replace(/\\/g, '/')
+        let relativePath = path.relative(baseDir!, filePath).replace(/\\/g, '/')
+
         if (!relativePath.startsWith('.')) {
           relativePath = './' + relativePath
         }
 
         relativePath = relativePath.replace(/^\.\.\//g, './')
-        componentUsages[component].push(relativePath)
+
+        // Проверяем, чтобы путь не дублировался
+        if (!componentUsages[component].includes(relativePath)) {
+          componentUsages[component].push(relativePath)
+        }
       }
     }
   }
@@ -134,13 +139,12 @@ export function toKebabCase(str: string) {
   return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
-// Функция для получения файлов из директории (рекурсивно)
 export async function getFiles(dir: string, filePattern: RegExp) {
   let files: string[] = []
 
-  const dirents = await fs.promises.readdir(dir, { withFileTypes: true })
+  const dirs = await fs.promises.readdir(dir, { withFileTypes: true })
 
-  for (const dirent of dirents) {
+  for (const dirent of dirs) {
     const res = path.resolve(dir, dirent.name)
     if (dirent.isDirectory()) {
       files = files.concat(await getFiles(res, filePattern))
