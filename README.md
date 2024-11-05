@@ -26,10 +26,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [
-    componentRelationshipsPlugin({
-      iconsPath: path.join(process.cwd(), 'src', 'icons'),
-      iconComponentPath: path.resolve(process.cwd(), 'src', 'IconTemplate'),
-    }),
+    componentRelationshipsPlugin(),
   ],
 })
 ```
