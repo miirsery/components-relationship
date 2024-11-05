@@ -1,7 +1,7 @@
 import { PluginOption } from 'vite'
 import { ComponentRelationsType } from './types'
-import fs  from 'fs'
-import path  from 'path'
+const fs = require('fs')
+const path = require('path')
 
 // Опции по умолчанию
 const defaultOptions: ComponentRelationsType = {
@@ -62,10 +62,10 @@ export async function writeRelationsInFile(
 export async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: ComponentRelationsType) {
   for (const component in componentUsages) {
     const usage = componentUsages[component]
-    const storyFilePath = path.resolve(options.componentsPath!, component, `${component}.stories.ts`)
+    const storyFilePath = path.resolve(options.componentsPath, component, `${component}.stories.ts`)
 
     console.log(`[🔍] Проверка пути к файлу: ${storyFilePath}`)
-    
+
     if (fs.existsSync(storyFilePath)) {
       let content = await fs.promises.readFile(storyFilePath, 'utf-8')
 
@@ -115,7 +115,7 @@ export async function findComponentUsages(components: string[], options: Compone
           componentUsages[component] = []
         }
 
-        let relativePath = path.relative(baseDir!, filePath).replace(/\\/g, '/')
+        let relativePath = path.relative(baseDir, filePath).replace(/\\/g, '/')
         if (!relativePath.startsWith('.')) {
           relativePath = './' + relativePath
         }
