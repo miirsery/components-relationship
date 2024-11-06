@@ -5,14 +5,15 @@ const path = require('path')
 
 // Опции по умолчанию
 const defaultOptions: ComponentRelationsType = {
-  componentsPath: ['src/components'],
+  componentsPaths: ['src/components'],
   searchPath: 'src',
   baseDir: 'app',
   storyFilesPattern: '\\.stories\\.ts$',
   output: {
     path: './',
     fileName: 'component-usage.json',
-  }
+  },
+  showHiddenComponents: true,
 }
 
 // Плагин для обработки компонентных связей и обновления файлов Storybook
@@ -23,7 +24,7 @@ export const componentRelationshipsPlugin = (relationOptions?: ComponentRelation
     name: 'vite:component-relationships',
 
     async buildStart() {
-      const componentFiles = await Promise.all(options.componentsPath!.map(async (componentPath) => {
+      const componentFiles = await Promise.all(options.componentsPaths!.map(async (componentPath) => {
         return getFiles(componentPath as string, /\.vue$/)
       }))
       const flatComponentFiles = componentFiles.flat()
@@ -60,78 +61,121 @@ export async function writeRelationsInFile(
 }
 
 // Функция для обновления файлов Storybook
-export async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: ComponentRelationsType) {
+export async function updateStorybookFiles(
+  componentUsages: Record<string, string[]>,
+  options: ComponentRelationsType
+) {
+  const storyFilesPattern = new RegExp(options.storyFilesPattern!);
+
   for (const component in componentUsages) {
-    const usage = componentUsages[component]
-    const storyFilePath = path.resolve(options.componentsPath![0], component, `${component}.stories.ts`)
+    const usage = componentUsages[component];
+    let storyFiles: string[] = [];
 
-    console.log(`[🔍] Проверка пути к файлу: ${storyFilePath}`)
+    // Проходим по каждому пути из componentsPaths и ищем Storybook файлы
+    for (const componentPath of options.componentsPaths!) {
+      const componentDir = path.resolve(componentPath, component);
+      const foundFiles = await getFiles(componentDir, storyFilesPattern);
 
-    if (fs.existsSync(storyFilePath)) {
-      let content = await fs.promises.readFile(storyFilePath, 'utf-8')
+      if (foundFiles.length > 0) {
+        storyFiles = storyFiles.concat(foundFiles);
+      }
+    }
 
-      const usageString = `Использования компонента ${component}:\n- ${usage.join('\n- ')}`
+    if (storyFiles.length === 0) {
+      continue;
+    }
 
-      content = content.replace(/meta\.parameters\s*=\s*{[\s\S]*?}\s*/, '')
+    // Обновляем каждый найденный Storybook файл
+    for (const storyFilePath of storyFiles) {
+      if (fs.existsSync(storyFilePath)) {
+        let content = await fs.promises.readFile(storyFilePath, 'utf-8');
 
-      const newParameters = `\nmeta.parameters = {
+        const usageString = `Использования компонента ${component}:\n- ${usage.join('\n- ')}`;
+
+        const newParameters = `meta.parameters = {
   docs: {
     description: {
       component: \`${usageString}\`
     }
   }
-}`
+};`;
 
-      content += newParameters.trim() + '\n'
+        const metaParametersRegex = /meta\.parameters\s*=\s*{(?:[^{}]*|{(?:[^{}]*|{[^{}]*})*})*};?\s*/gs;
 
-      await fs.promises.writeFile(storyFilePath, content)
-      console.log(`[✅] Обновлен Storybook файл: ${storyFilePath}`)
-    } else {
-      console.warn(`[⚠️] Файл не найден: ${storyFilePath}`)
+        if (content.match(metaParametersRegex)) {
+          content = content.replace(metaParametersRegex, newParameters);
+        } else {
+          content += `\n${newParameters}\n`;
+        }
+
+        await fs.promises.writeFile(storyFilePath, content);
+        console.log(`[✅] Обновлен Storybook файл: ${storyFilePath}`);
+      }
     }
   }
 }
 
 // Функция для поиска использования компонентов
-export async function findComponentUsages(components: string[], options: ComponentRelationsType) {
-  const { baseDir, searchPath } = options
+export async function findComponentUsages(
+  components: string[],
+  options: ComponentRelationsType
+) {
+  const { baseDir, searchPath, showHiddenComponents } = options;
+  const componentUsages: Record<string, string[]> = {};
 
-  const componentUsages: Record<string, string[]> = {}
+  // Получаем все файлы для анализа
+  const paths = await getFiles(searchPath as string, /\.(vue)$/);
 
-  const paths = await getFiles(searchPath as string, /\.(vue)$/)
-
-  // Ищем использования для каждого компонента
   for (const filePath of paths) {
-    const content = await fs.promises.readFile(filePath, 'utf-8')
+    const content = await fs.promises.readFile(filePath, 'utf-8');
+
+    // Находим все закомментированные фрагменты (однострочные и многострочные)
+    const comments = content.match(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\/|\/\/.*/g) || [];
+
+    // Объединяем все комментарии в одну строку для упрощения поиска
+    const commentsCombined = comments.join('\n');
 
     for (const component of components) {
-      const camelCaseRegex = new RegExp(`<${component}[^>]*>`, 'g')
-      const kebabCaseRegex = new RegExp(`<${toKebabCase(component)}[^>]*>`, 'g')
+      const camelCaseRegex = new RegExp(`<${component}[^>]*>`, 'g');
+      const kebabCaseRegex = new RegExp(`<${toKebabCase(component)}[^>]*>`, 'g');
 
-      // Проверяем, встречается ли компонент в файле
-      if (camelCaseRegex.test(content) || kebabCaseRegex.test(content)) {
-        // Если не существует записи для данного компонента, создаем ее
+      // Проверка, используется ли компонент в файле
+      const isComponentInContent = camelCaseRegex.test(content) || kebabCaseRegex.test(content);
+
+      let isComponentUsed = false;
+
+      if (isComponentInContent) {
+        if (showHiddenComponents) {
+          // Если опция showHiddenComponents = true, включаем компонент в любом случае
+          isComponentUsed = true;
+        } else {
+          // Если showHiddenComponents = false, исключаем компоненты в комментариях
+          const isInComments = commentsCombined.includes(`<${component}`) || commentsCombined.includes(`<${toKebabCase(component)}`);
+          isComponentUsed = !isInComments;
+        }
+      }
+
+      if (isComponentUsed) {
         if (!componentUsages[component]) {
-          componentUsages[component] = []
+          componentUsages[component] = [];
         }
 
-        let relativePath = path.relative(baseDir!, filePath).replace(/\\/g, '/')
-
+        // Преобразуем путь к относительному
+        let relativePath = path.relative(baseDir!, filePath).replace(/\\/g, '/');
         if (!relativePath.startsWith('.')) {
-          relativePath = './' + relativePath
+          relativePath = './' + relativePath;
         }
+        relativePath = relativePath.replace(/^\.\.\//g, './');
 
-        relativePath = relativePath.replace(/^\.\.\//g, './')
-
-        // Проверяем, чтобы путь не дублировался
+        // Добавляем путь, если он еще не записан
         if (!componentUsages[component].includes(relativePath)) {
-          componentUsages[component].push(relativePath)
+          componentUsages[component].push(relativePath);
         }
       }
     }
   }
 
-  return componentUsages
+  return componentUsages;
 }
 
 // Функция для преобразования имени компонента в kebab-case
@@ -141,6 +185,11 @@ export function toKebabCase(str: string) {
 
 export async function getFiles(dir: string, filePattern: RegExp) {
   let files: string[] = []
+
+  // Проверка существования директории
+  if (!fs.existsSync(dir)) {
+    return files;
+  }
 
   const dirs = await fs.promises.readdir(dir, { withFileTypes: true })
 
