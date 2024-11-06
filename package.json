@@ -3,7 +3,7 @@
   "description": "Vite Plugin for generate components relations",
   "author": "miirsery",
   "private": false,
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "files": [
     "dist"
