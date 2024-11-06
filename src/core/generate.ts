@@ -1,9 +1,9 @@
 import { PluginOption } from 'vite'
-import { ComponentRelationsType } from './types'
 const fs = require('fs')
 const path = require('path')
 
-// Опции по умолчанию
+import { ComponentRelationsType } from './types'
+
 const defaultOptions: ComponentRelationsType = {
   componentsPaths: ['src/components'],
   searchPath: 'src',
@@ -67,32 +67,37 @@ export async function updateStorybookFiles(
 ) {
   const storyFilesPattern = new RegExp(options.storyFilesPattern!);
 
-  for (const component in componentUsages) {
-    const usage = componentUsages[component];
+  const allComponents = await Promise.all(options.componentsPaths!.map(async (componentPath) => {
+    return getFiles(componentPath as string, /\.vue$/);
+  }));
+  const flatComponentFiles = allComponents.flat();
+  const allComponentNames = flatComponentFiles.map((file) => path.basename(file, path.extname(file)));
+
+  for (const component of allComponentNames) {
+    const usage = componentUsages[component] || [];
     let storyFiles: string[] = [];
 
-    // Проходим по каждому пути из componentsPaths и ищем Storybook файлы
     for (const componentPath of options.componentsPaths!) {
       const componentDir = path.resolve(componentPath, component);
       const foundFiles = await getFiles(componentDir, storyFilesPattern);
-
-      if (foundFiles.length > 0) {
-        storyFiles = storyFiles.concat(foundFiles);
-      }
+      storyFiles = storyFiles.concat(foundFiles);
     }
 
     if (storyFiles.length === 0) {
       continue;
     }
 
-    // Обновляем каждый найденный Storybook файл
     for (const storyFilePath of storyFiles) {
+      console.log(`[🔍] Проверка пути к файлу: ${storyFilePath}`);
+
       if (fs.existsSync(storyFilePath)) {
         let content = await fs.promises.readFile(storyFilePath, 'utf-8');
+        const metaParametersRegex = /meta\.parameters\s*=\s*{(?:[^{}]*|{(?:[^{}]*|{[^{}]*})*})*};?\s*/gs;
 
-        const usageString = `Использования компонента ${component}:\n- ${usage.join('\n- ')}`;
-
-        const newParameters = `meta.parameters = {
+        // Если компонент используется, обновляем или добавляем meta.parameters
+        if (usage.length > 0) {
+          const usageString = `Использования компонента ${component}:\n- ${usage.join('\n- ')}`;
+          const newParameters = `meta.parameters = {
   docs: {
     description: {
       component: \`${usageString}\`
@@ -100,16 +105,23 @@ export async function updateStorybookFiles(
   }
 };`;
 
-        const metaParametersRegex = /meta\.parameters\s*=\s*{(?:[^{}]*|{(?:[^{}]*|{[^{}]*})*})*};?\s*/gs;
-
-        if (content.match(metaParametersRegex)) {
-          content = content.replace(metaParametersRegex, newParameters);
+          if (content.match(metaParametersRegex)) {
+            content = content.replace(metaParametersRegex, newParameters);
+          } else {
+            content += `\n${newParameters}\n`;
+          }
+          console.log(`[✅] Обновлен Storybook файл: ${storyFilePath}`);
         } else {
-          content += `\n${newParameters}\n`;
+          // Если компонент больше не используется, удаляем meta.parameters
+          if (content.match(metaParametersRegex)) {
+            content = content.replace(metaParametersRegex, '');
+            console.log(`[🗑️] Удален meta.parameters из файла: ${storyFilePath}`);
+          }
         }
 
         await fs.promises.writeFile(storyFilePath, content);
-        console.log(`[✅] Обновлен Storybook файл: ${storyFilePath}`);
+      } else {
+        console.warn(`[⚠️] Файл не найден: ${storyFilePath}`);
       }
     }
   }
@@ -123,30 +135,25 @@ export async function findComponentUsages(
   const { baseDir, searchPath, showHiddenComponents } = options;
   const componentUsages: Record<string, string[]> = {};
 
-  // Получаем все файлы для анализа
   const paths = await getFiles(searchPath as string, /\.(vue)$/);
 
   for (const filePath of paths) {
     const content = await fs.promises.readFile(filePath, 'utf-8');
 
-    // Находим все закомментированные фрагменты (однострочные и многострочные)
     const comments = content.match(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\/|\/\/.*/g) || [];
 
-    // Объединяем все комментарии в одну строку для упрощения поиска
     const commentsCombined = comments.join('\n');
 
     for (const component of components) {
       const camelCaseRegex = new RegExp(`<${component}[^>]*>`, 'g');
       const kebabCaseRegex = new RegExp(`<${toKebabCase(component)}[^>]*>`, 'g');
 
-      // Проверка, используется ли компонент в файле
       const isComponentInContent = camelCaseRegex.test(content) || kebabCaseRegex.test(content);
 
       let isComponentUsed = false;
 
       if (isComponentInContent) {
         if (showHiddenComponents) {
-          // Если опция showHiddenComponents = true, включаем компонент в любом случае
           isComponentUsed = true;
         } else {
           // Если showHiddenComponents = false, исключаем компоненты в комментариях
@@ -160,14 +167,12 @@ export async function findComponentUsages(
           componentUsages[component] = [];
         }
 
-        // Преобразуем путь к относительному
         let relativePath = path.relative(baseDir!, filePath).replace(/\\/g, '/');
         if (!relativePath.startsWith('.')) {
           relativePath = './' + relativePath;
         }
         relativePath = relativePath.replace(/^\.\.\//g, './');
 
-        // Добавляем путь, если он еще не записан
         if (!componentUsages[component].includes(relativePath)) {
           componentUsages[component].push(relativePath);
         }
@@ -186,7 +191,6 @@ export function toKebabCase(str: string) {
 export async function getFiles(dir: string, filePattern: RegExp) {
   let files: string[] = []
 
-  // Проверка существования директории
   if (!fs.existsSync(dir)) {
     return files;
   }
