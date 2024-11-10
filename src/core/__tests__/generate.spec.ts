@@ -1,7 +1,7 @@
 import { describe, expect, test, vi, afterEach } from 'vitest'
-import fs from 'fs'
-import path from 'path'
-import { toKebabCase, getFiles, findComponentUsages } from '../generate'
+const fs = require('fs')
+const path = require('path')
+import {toKebabCase, getFiles, findComponentUsages, writeRelationsInFile, updateStorybookFiles} from '../generate'
 
 // Mock fs and path modules
 vi.mock('fs')
@@ -23,49 +23,59 @@ describe('toKebabCase', () => {
 })
 
 describe('getFiles', () => {
-  test('returns files matching the pattern', async () => {
-    const mockFiles = [
-      { name: 'file1.vue', isDirectory: () => false },
-      { name: 'file2.vue', isDirectory: () => false },
-      { name: 'dir', isDirectory: () => true }
-    ]
-    const mockDirents = {
-      readdir: vi.fn().mockResolvedValue(mockFiles),
-      resolve: vi.fn((...args) => args.join('/'))
-    }
-    fs.promises.readdir = mockDirents.readdir
-    path.resolve = mockDirents.resolve
+  test('should return files matching the pattern', async () => {
+    // Мок файлов и директорий
+    (fs.readdir).mockResolvedValue([
+      { name: 'Component.vue', isDirectory: () => false },
+      { name: 'SubFolder', isDirectory: () => true },
+    ]);
+    (fs.stat).mockResolvedValue({ isDirectory: () => false });
+    (path.resolve).mockImplementation((...args: any[]) => args.join('/'));
 
-    const files = await getFiles('src', /\.vue$/)
-    expect(files).toEqual(['src/file1.vue', 'src/file2.vue'])
-  })
-})
+    const result = await getFiles('src/components', /\.vue$/);
+    expect(result).toEqual(['src/components/Component.vue']);
+  });
+});
+
+describe('writeRelationsInFile', () => {
+  test('should write component relations to JSON file', async () => {
+    const mockData = { MyComponent: ['./src/components/MyComponent.vue'] };
+    const outputOptions = { path: './output', fileName: 'test.json' };
+
+    await writeRelationsInFile(mockData, outputOptions);
+
+    const expectedPath = './output/test.json';
+    expect(fs.mkdir).toHaveBeenCalledWith(outputOptions.path, { recursive: true });
+    expect(fs.writeFile).toHaveBeenCalledWith(expectedPath, JSON.stringify(mockData, null, 2));
+  });
+});
 
 describe('findComponentUsages', () => {
-  test('finds component usages in files', async () => {
-    const mockFiles = [
-      'src/components/App.vue',
-      'src/components/HelloWorld.vue'
-    ]
-    const mockFileContent: Record<string, string> = {
-      'src/components/App.vue': '<template><HelloWorld /></template>',
-      'src/components/HelloWorld.vue': '<template><div>Hello World</div></template>'
-    }
-    const mockFs = {
-      readFile: vi.fn((filePath) => Promise.resolve(mockFileContent[filePath])),
-      readdir: vi.fn().mockResolvedValue(mockFiles.map(file => ({ name: file, isDirectory: () => false }))),
-      resolve: vi.fn((...args) => args.join('/'))
-    }
-    // @ts-ignore
-    fs.promises.readFile = mockFs.readFile
-    fs.promises.readdir = mockFs.readdir
-    path.resolve = mockFs.resolve
+  test('should detect component usage in Vue files', async () => {
+    const components = ['MyComponent'];
+    const options = { baseDir: 'app', searchPath: 'src', showHiddenComponents: true };
 
-    const components = ['HelloWorld']
-    const options = { baseDir: 'src/components', searchPath: 'src/components' }
-    const usages = await findComponentUsages(components, options)
-    expect(usages).toEqual({
-      HelloWorld: ['./App.vue']
-    })
-  })
-})
+    (fs.readFile).mockResolvedValue('<template><MyComponent /></template>');
+    (fs.readdir).mockResolvedValue([{ name: 'Test.vue', isDirectory: () => false }]);
+
+    const result = await findComponentUsages(components, options);
+    expect(result).toEqual({ MyComponent: ['./src/Test.vue'] });
+  });
+});
+
+describe('updateStorybookFiles', () => {
+  test('should update Storybook files with component usage information', async () => {
+    const componentUsages = { MyComponent: ['./src/SomeComponent.vue'] };
+    const options = {
+      componentsPaths: ['src/components'],
+      storyFilesPattern: '\\.stories\\.ts$',
+    };
+
+    (fs.readFile).mockResolvedValue('meta.parameters = {};');
+    (fs.writeFile).mockResolvedValue();
+
+    await updateStorybookFiles(componentUsages, options);
+
+    expect(fs.writeFile).toHaveBeenCalled();
+  });
+});
