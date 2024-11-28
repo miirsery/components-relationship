@@ -104,7 +104,6 @@ export async function updateStorybookFiles(
     }
   }
 }`
-
           if (content.match(metaParametersRegex)) {
             content = content.replace(metaParametersRegex, newParameters)
           } else {
@@ -222,6 +221,7 @@ export async function getFiles(dir: string, filePattern: RegExp) {
 
   for (const dirent of dirs) {
     const res = path.resolve(dir, dirent.name)
+
     if (dirent.isDirectory()) {
       files = files.concat(await getFiles(res, filePattern))
     } else if (filePattern.test(res)) {

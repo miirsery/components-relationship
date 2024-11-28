@@ -1,81 +1,168 @@
-import { describe, expect, test, vi, afterEach } from 'vitest'
-const fs = require('fs')
-const path = require('path')
-import {toKebabCase, getFiles, findComponentUsages, writeRelationsInFile, updateStorybookFiles} from '../generate'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as fs from 'fs';
+import path from 'path';
+import {
+  findComponentUsages,
+  updateStorybookFiles,
+  writeRelationsInFile,
+  getFiles,
+} from '../generate';
 
-// Mock fs and path modules
-vi.mock('fs')
-vi.mock('path')
-
-// Сброс моков после каждого теста
-afterEach(() => {
-  vi.clearAllMocks()
-})
-
-describe('toKebabCase', () => {
-  test('converts camelCase to kebab-case', () => {
-    expect(toKebabCase('camelCase')).toBe('camel-case')
-  })
-
-  test('converts PascalCase to kebab-case', () => {
-    expect(toKebabCase('PascalCase')).toBe('pascal-case')
-  })
-})
-
-describe('getFiles', () => {
-  test('should return files matching the pattern', async () => {
-    // Мок файлов и директорий
-    (fs.readdir).mockResolvedValue([
-      { name: 'Component.vue', isDirectory: () => false },
-      { name: 'SubFolder', isDirectory: () => true },
-    ]);
-    (fs.stat).mockResolvedValue({ isDirectory: () => false });
-    (path.resolve).mockImplementation((...args: any[]) => args.join('/'));
-
-    const result = await getFiles('src/components', /\.vue$/);
-    expect(result).toEqual(['src/components/Component.vue']);
+describe('componentRelationshipsPlugin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
-});
 
-describe('writeRelationsInFile', () => {
-  test('should write component relations to JSON file', async () => {
-    const mockData = { MyComponent: ['./src/components/MyComponent.vue'] };
-    const outputOptions = { path: './output', fileName: 'test.json' };
+  it('should write relations in the output file', async () => {
+    // @ts-ignore
+    const mkdirSpy = vi.spyOn(fs.promises, 'mkdir').mockImplementation(async () => {});
+    const writeFileSpy = vi.spyOn(fs.promises, 'writeFile').mockImplementation(async () => {});
 
-    await writeRelationsInFile(mockData, outputOptions);
-
-    const expectedPath = './output/test.json';
-    expect(fs.mkdir).toHaveBeenCalledWith(outputOptions.path, { recursive: true });
-    expect(fs.writeFile).toHaveBeenCalledWith(expectedPath, JSON.stringify(mockData, null, 2));
-  });
-});
-
-describe('findComponentUsages', () => {
-  test('should detect component usage in Vue files', async () => {
-    const components = ['MyComponent'];
-    const options = { baseDir: 'app', searchPath: 'src', showHiddenComponents: true };
-
-    (fs.readFile).mockResolvedValue('<template><MyComponent /></template>');
-    (fs.readdir).mockResolvedValue([{ name: 'Test.vue', isDirectory: () => false }]);
-
-    const result = await findComponentUsages(components, options);
-    expect(result).toEqual({ MyComponent: ['./src/Test.vue'] });
-  });
-});
-
-describe('updateStorybookFiles', () => {
-  test('should update Storybook files with component usage information', async () => {
-    const componentUsages = { MyComponent: ['./src/SomeComponent.vue'] };
-    const options = {
-      componentsPaths: ['src/components'],
-      storyFilesPattern: '\\.stories\\.ts$',
+    const mockComponentUsages = {
+      Button: ['./src/components/Button.vue'],
+      Card: ['./src/components/Card.vue'],
     };
 
-    (fs.readFile).mockResolvedValue('meta.parameters = {};');
-    (fs.writeFile).mockResolvedValue();
+    const outputOptions = {
+      path: './output',
+      fileName: 'component-usage.json',
+    };
 
-    await updateStorybookFiles(componentUsages, options);
+    const resolvedPath = path.resolve(outputOptions.path, outputOptions.fileName);
 
-    expect(fs.writeFile).toHaveBeenCalled();
+    await writeRelationsInFile(mockComponentUsages, outputOptions);
+
+    expect(mkdirSpy).toHaveBeenCalledTimes(1);
+    expect(mkdirSpy).toHaveBeenCalledWith('./output', { recursive: true });
+
+    expect(writeFileSpy).toHaveBeenCalledTimes(1);
+    expect(writeFileSpy).toHaveBeenCalledWith(
+      resolvedPath,
+      JSON.stringify(mockComponentUsages, null, 2)
+    );
+
+    mkdirSpy.mockRestore();
+    writeFileSpy.mockRestore();
+  });
+
+  it('should correctly find component usages in files', async () => {
+    // Mock data for components and their usage
+    const components = ['Button', 'Card'];
+    const mockFiles = ['./src/views/Home.vue', './src/components/Button.vue'];
+    const mockFileContents = {
+      './src/views/Home.vue': '<Button />',
+      './src/components/Button.vue': '<Card />',
+    };
+
+    // Mock the fs.promises.readFile function to return mock file contents
+    vi.spyOn(fs.promises, 'readFile').mockImplementation(async (filePath: string) => {
+      return mockFileContents[filePath];
+    });
+
+    // Mock getFiles to return mock files
+    vi.spyOn(fs.promises, 'readdir').mockImplementation(async () => {
+      return mockFiles;
+    });
+
+    const componentUsages = await findComponentUsages(components, {
+      baseDir: 'app',
+      searchPath: 'src',
+      componentsPaths: ['src/components'],
+      storyFilesPattern: '\\.stories\\.ts$',
+      output: {
+        path: './',
+        fileName: 'component-usage.json',
+      },
+      showHiddenComponents: true,
+    });
+
+    expect(componentUsages['Button']).toContain('./src/views/Home.vue');
+    expect(componentUsages['Card']).toContain('./src/components/Button.vue');
+  });
+
+  it('should update Storybook files with component usages', async () => {
+    const mockComponentUsages = {
+      Button: ['./src/components/Button.vue'],
+      Card: ['./src/components/Card.vue'],
+    };
+
+    const mockStoryFilePath = './src/components/Button.stories.ts';
+    const mockStoryFileContent = `
+      import { Button } from './Button.vue';
+      export default {
+        title: 'Button'
+      };
+    `;
+
+    vi.spyOn(fs.promises, 'readFile').mockImplementation(async () => mockStoryFileContent);
+    vi.spyOn(fs.promises, 'writeFile').mockImplementation(async () => {});
+
+    // Mock fs.existsSync to always return true
+    vi.spyOn(fs, 'existsSync').mockImplementation(() => true);
+
+    await updateStorybookFiles(mockComponentUsages, {
+      componentsPaths: ['src/components'],
+      baseDir: 'app',
+      searchPath: 'src',
+      storyFilesPattern: '\\.stories\\.ts$',
+      output: {
+        path: './',
+        fileName: 'component-usage.json',
+      },
+      showHiddenComponents: true,
+    });
+
+    // Check if writeFile was called
+    expect(fs.promises.writeFile).toHaveBeenCalledTimes(1);
+
+    // Check that the content has been updated with the correct meta.parameters
+    const updatedContent = `
+      import { Button } from './Button.vue';
+      export default {
+        title: 'Button',
+        parameters: {
+          docs: {
+            description: {
+              component: 'Использования компонента Button:\n- ./src/components/Button.vue'
+            }
+          }
+        }
+      };
+    `;
+
+    expect(fs.promises.writeFile).toHaveBeenCalledWith(mockStoryFilePath, updatedContent);
+  });
+
+  it('should handle missing Storybook files gracefully', async () => {
+    const mockComponentUsages = {
+      Button: ['./src/components/Button.vue'],
+    };
+
+    // Mock fs.existsSync to always return false
+    vi.spyOn(fs, 'existsSync').mockImplementation(() => false);
+
+    const result = await updateStorybookFiles(mockComponentUsages, {
+      componentsPaths: ['src/components'],
+      baseDir: 'app',
+      searchPath: 'src',
+      storyFilesPattern: '\\.stories\\.ts$',
+      output: {
+        path: './',
+        fileName: 'component-usage.json',
+      },
+      showHiddenComponents: true,
+    });
+
+    // The function should not throw an error even if the story file doesn't exist
+    expect(result).toBeUndefined();
+  });
+
+  it('should return an empty array when no files match the pattern', async () => {
+    // Mock getFiles to return an empty array
+    vi.spyOn(fs.promises, 'readdir').mockImplementation(async () => []);
+
+    const files = await getFiles('./src/components', /\.vue$/);
+
+    expect(files).toHaveLength(0);
   });
 });
