@@ -1,6 +1,7 @@
 import { PluginOption } from 'vite'
-const fs = require('fs')
-const path = require('path')
+
+import path from 'path'
+import fs from 'fs'
 
 import { ComponentRelationsType } from './types'
 
@@ -24,9 +25,11 @@ export const componentRelationshipsPlugin = (relationOptions?: ComponentRelation
     name: 'vite:component-relationships',
 
     async buildStart() {
-      const componentFiles = await Promise.all(options.componentsPaths!.map(async (componentPath) => {
-        return getFiles(componentPath as string, /\.vue$/)
-      }))
+      const componentFiles = await Promise.all(
+        options.componentsPaths!.map(async (componentPath) => {
+          return getFiles(componentPath as string, /\.vue$/)
+        })
+      )
       const flatComponentFiles = componentFiles.flat()
       const components = flatComponentFiles.map((file) => path.basename(file, path.extname(file)))
       const componentUsages = await findComponentUsages(components, options)
@@ -44,7 +47,7 @@ export const componentRelationshipsPlugin = (relationOptions?: ComponentRelation
 
 export async function writeRelationsInFile(
   componentUsages: Record<string, string[]>,
-  outputOptions: { path: string, fileName: string }
+  outputOptions: { path: string; fileName: string }
 ) {
   const jsonString = JSON.stringify(componentUsages, null, 2)
 
@@ -61,15 +64,14 @@ export async function writeRelationsInFile(
 }
 
 // Функция для обновления файлов Storybook
-export async function updateStorybookFiles(
-  componentUsages: Record<string, string[]>,
-  options: ComponentRelationsType
-) {
+export async function updateStorybookFiles(componentUsages: Record<string, string[]>, options: ComponentRelationsType) {
   const storyFilesPattern = new RegExp(options.storyFilesPattern!)
 
-  const allComponents = await Promise.all(options.componentsPaths!.map(async (componentPath) => {
-    return getFiles(componentPath as string, /\.vue$/)
-  }))
+  const allComponents = await Promise.all(
+    options.componentsPaths!.map(async (componentPath) => {
+      return getFiles(componentPath as string, /\.vue$/)
+    })
+  )
   const flatComponentFiles = allComponents.flat()
   const allComponentNames = flatComponentFiles.map((file) => path.basename(file, path.extname(file)))
 
@@ -127,10 +129,7 @@ export async function updateStorybookFiles(
 }
 
 // Функция для поиска использования компонентов
-export async function findComponentUsages(
-  components: string[],
-  options: ComponentRelationsType
-) {
+export async function findComponentUsages(components: string[], options: ComponentRelationsType) {
   const { baseDir, searchPath, showHiddenComponents } = options
   const componentUsages: Record<string, string[]> = {}
 
@@ -145,7 +144,6 @@ export async function findComponentUsages(
     const asyncComponentRegex = /defineAsyncComponent\(\s*\{\s*loader:\s*\(\)\s*=>\s*import\(['"](.+?)['"]\)/g
     let asyncComponentMatch
 
-
     const asyncComponents: string[] = []
 
     while ((asyncComponentMatch = asyncComponentRegex.exec(content)) !== null) {
@@ -159,9 +157,7 @@ export async function findComponentUsages(
       const kebabCaseRegex = new RegExp(`<${toKebabCase(component)}[^>]*>`, 'g')
 
       const isComponentInContent =
-        camelCaseRegex.test(content) ||
-        kebabCaseRegex.test(content) ||
-        asyncComponents.includes(component)
+        camelCaseRegex.test(content) || kebabCaseRegex.test(content) || asyncComponents.includes(component)
 
       let isComponentUsed = false
 
@@ -169,8 +165,8 @@ export async function findComponentUsages(
         if (showHiddenComponents) {
           isComponentUsed = true
         } else {
-          const isInComments = commentsCombined.includes(`<${component}`) ||
-            commentsCombined.includes(`<${toKebabCase(component)}`)
+          const isInComments =
+            commentsCombined.includes(`<${component}`) || commentsCombined.includes(`<${toKebabCase(component)}`)
 
           isComponentUsed = !isInComments
         }
@@ -206,8 +202,7 @@ export function toKebabCase(str: string) {
 
 // Функция для преобразования имени компонента в PascalCase
 export function toPascalCase(str: string) {
-  return str
-    .replace(/(^\w|-\w)/g, (match) => match.replace(/-/, '').toUpperCase())
+  return str.replace(/(^\w|-\w)/g, (match) => match.replace(/-/, '').toUpperCase())
 }
 
 export async function getFiles(dir: string, filePattern: RegExp) {
