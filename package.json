@@ -9,7 +9,7 @@
     "dist"
   ],
   "bin": {
-    "components": "bin/index.cjs"
+    "components": "packages/core/bin/index.mjs"
   },
   "main": "./dist/component-relationships.umd.cjs",
   "module": "./dist/component-relationships.js",
@@ -30,34 +30,35 @@
   },
   "homepage": "https://github.com/miirsery/components-relationship/tree/master/#readme",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "prepare": "husky",
-    "eslint": "eslint . --ext .js,.tsx,.ts",
-    "eslint:fix": "pnpm run eslint --fix",
-    "lint": "pnpm eslint",
-    "lint:fix": "pnpm eslint:fix",
-    "prettier": "prettier --check .",
-    "prettier:fix": "prettier --write .",
-    "type-check": "tsc --noEmit --skipLibCheck",
-    "unit": "vitest run"
+    "test": "vitest"
   },
   "peerDependencies": {
-    "vite": "5.4.6"
+    "vite": ">=4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
-    "happy-dom": "15.10.2",
+    "@typescript-eslint/eslint-plugin": "^7.0.2",
+    "@typescript-eslint/parser": "^7.0.2",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "happy-dom": "^13.6.2",
     "husky": "^9.0.11",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
-    "vite": "5.4.6",
-    "vite-plugin-dts": "^3.7.2",
-    "vite-plugin-node-polyfills": "^0.21.0",
+    "lint-staged": "^15.2.11",
+    "prettier": "^3.2.4",
+    "typescript": "^5.2.2",
+    "unbuild": "^3.0.1",
+    "vite": "^5.1.4",
     "vitest": "^1.3.1"
   },
-  "dependencies": {
-    "tsx": "^4.19.2"
+  "lint-staged": {
+    "*": [
+      "prettier --write --ignore-unknown"
+    ],
+    "packages/*/{src,types}/**/*.ts": [
+      "eslint --ext .ts"
+    ],
+    "packages/**/*.d.ts": [
+      "eslint --ext .ts"
+    ]
   }
 }

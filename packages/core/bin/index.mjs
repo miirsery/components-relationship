@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-const { build } = require('vite')
-const { componentRelationshipsPlugin } = require('../dist/component-relationships.cjs')
+import { componentRelationshipsPlugin } from '../dist/index.mjs'
 
-// Функция для запуска компонента
+import { build } from 'vite'
+
 ;(async () => {
   try {
     await build({
